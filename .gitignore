@@ -1,0 +1,11 @@
+node_modules/
+dist/
+fixtures/
+.env
+.vercel
+.env*
+!.env.example
+.DS_Store
+.agents/
+.claude/
+skills-lock.json

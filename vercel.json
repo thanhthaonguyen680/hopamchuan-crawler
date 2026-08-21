@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/api/index" },
+    { "source": "/login", "destination": "/api/login" },
+    { "source": "/search", "destination": "/api/search" },
+    { "source": "/song/:id", "destination": "/api/song/:id" }
+  ],
+  "functions": {
+    "api/crawl.ts": { "maxDuration": 300 }
+  }
+}

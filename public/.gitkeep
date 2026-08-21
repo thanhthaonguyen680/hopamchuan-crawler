@@ -1,0 +1,1 @@
+This project has no static frontend — all routes are served by api/*.ts (see vercel.json rewrites).
