@@ -52,7 +52,15 @@ export async function parseSongHtml(
           model: MODEL,
           system_instruction: SYSTEM_PROMPT,
           input: `source_url: ${sourceUrl}${correction}\n\nHTML:\n${cleanedHtml}`,
-          generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
+          // "minimal" thinking — this is mechanical extraction from HTML we
+          // already provide, not a task that benefits from extended
+          // reasoning, and the default dynamic thinking budget was adding
+          // significant latency for no quality gain.
+          // "minimal" thinking — this is mechanical extraction from HTML we
+          // already provide, not a task that benefits from extended
+          // reasoning, and the default dynamic thinking budget was adding
+          // significant latency for no quality gain.
+          generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS, thinking_level: "minimal" },
           // Force JSON-syntax output without pinning to a strict schema dialect
           // (Gemini's schema support has version-specific quirks) — the shared
           // validate() below is the real correctness gate either way.
