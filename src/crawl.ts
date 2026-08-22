@@ -24,6 +24,7 @@ import {
   newRunId,
   getPool,
 } from "./lib/db.js";
+import { findUserByUsername } from "./lib/auth.js";
 
 function getArg(name: string): string | undefined {
   const idx = process.argv.indexOf(`--${name}`);
@@ -37,6 +38,20 @@ async function main() {
   const discoverOnly = hasFlag("discover-only");
   const dryRun = discoverOnly || hasFlag("dry-run");
   const runId = newRunId();
+
+  // Songs are per-user now — CRAWL_USERNAME picks which account owns
+  // whatever this run crawls. Sign up at /signup on the web app first.
+  const crawlUsername = process.env.CRAWL_USERNAME;
+  if (!crawlUsername) {
+    console.error("CRAWL_USERNAME not set in .env — sign up an account at /signup on the web app, then set CRAWL_USERNAME to that username.");
+    process.exit(1);
+  }
+  const crawlUser = await findUserByUsername(crawlUsername);
+  if (!crawlUser) {
+    console.error(`No user named "${crawlUsername}" found — sign up at /signup first, then set CRAWL_USERNAME to match.`);
+    process.exit(1);
+  }
+  const userId = crawlUser.id;
 
   const maxIdsToProbe = Number(getArg("probe") ?? process.env.CRAWL_ID_BATCH_SIZE ?? 200);
   const maxConsecutiveMisses = Number(
@@ -68,7 +83,7 @@ async function main() {
     });
   } else {
     const overrideStart = getArg("start");
-    const maxKnownId = overrideStart ? Number(overrideStart) - 1 : await getMaxKnownSourceId();
+    const maxKnownId = overrideStart ? Number(overrideStart) - 1 : await getMaxKnownSourceId(userId);
     const startId = maxKnownId + 1;
 
     console.log(
@@ -96,7 +111,7 @@ async function main() {
   for (const song of discovered) {
     const startedAt = new Date();
 
-    if (!dryRun && (await sourceIdExists(song.id))) {
+    if (!dryRun && (await sourceIdExists(userId, song.id))) {
       skipped++;
       await insertCrawlLog({
         runId,
@@ -142,7 +157,7 @@ async function main() {
           startedAt,
           finishedAt: new Date(),
         });
-        await upsertSong(song.id, parsed);
+        await upsertSong(userId, song.id, parsed);
         await insertCrawlLog({
           runId,
           sourceId: song.id,

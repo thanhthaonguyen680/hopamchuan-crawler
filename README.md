@@ -18,6 +18,9 @@ npm install
 cp .env.example .env
 # điền GEMINI_API_KEY (free tại aistudio.google.com/apikey) + DATABASE_URL vào .env
 npm run migrate
+# vào https://hopamchuan-crawler.vercel.app/signup tạo tài khoản, rồi điền
+# username đó vào CRAWL_USERNAME trong .env — script local dùng để biết ghi
+# bài crawl được vào tài khoản nào
 ```
 
 ## Các lệnh chính
@@ -30,7 +33,7 @@ npm run migrate
 | `npm run crawl -- --discover-only` | Chỉ discovery + fetch, không gọi LLM, không ghi DB — miễn phí 100% |
 | `npm run crawl -- --dry-run` | Gọi LLM thật nhưng không ghi DB — test chất lượng parse |
 | `npm run viewer` | Web viewer local tại http://localhost:3000 |
-| `npm run migrate` | Tạo bảng `songs` + `crawl_log` |
+| `npm run migrate` | Tạo bảng `users` + `songs` + `crawl_log` |
 
 ## Cấu trúc
 
@@ -49,14 +52,14 @@ src/lib/
 src/crawl.ts     script tổng — production entrypoint
 src/viewer.ts    web server local (npm run viewer)
 api/*.ts         Vercel serverless functions (bản public, cùng logic render.ts)
-sql/schema.sql   DDL bảng songs, crawl_log, users
+sql/schema.sql   DDL bảng users, songs (per-user), crawl_log
 ```
 
 ## Deploy (Vercel)
 
 - `api/*.ts` dùng chung `src/lib/render.ts` với `src/viewer.ts` — chỉ khác lớp server (Vercel function vs Node http server liên tục). Script crawl/parse **không** chạy trên Vercel, chỉ chạy local; Vercel chỉ đọc/ghi DB qua web UI (crawl button, xoá bài).
 - `DATABASE_URL` trỏ thẳng Neon — cùng 1 DB cho local và Vercel, crawl xong thấy ngay trên web.
-- Login: đa người dùng, tự `/signup` tạo tài khoản (username + mật khẩu hash bằng scrypt, lưu bảng `users`). Session là cookie `hac_session` ký bằng `SESSION_SECRET` (HMAC, chứa user id + chữ ký — không phải mật khẩu). Mọi người dùng chung 1 danh sách bài hát, tài khoản chỉ để đăng nhập, không tách dữ liệu riêng. `requireAuth()` gate mọi route, `noindex` để Google không index.
+- Login: đa người dùng, tự `/signup` tạo tài khoản (username + mật khẩu hash bằng scrypt, lưu bảng `users`). Session là cookie `hac_session` ký bằng `SESSION_SECRET` (HMAC, chứa user id + chữ ký — không phải mật khẩu). **Dữ liệu tách riêng theo tài khoản**: `songs.user_id` + unique index theo `(user_id, source_id)` — mỗi người có danh sách bài hát của riêng mình, crawl trùng ID hopamchuan.com vẫn ra 2 bản ghi riêng cho 2 tài khoản. `requireAuth()` gate mọi route, `noindex` để Google không index.
 - ⚠️ `vercel dev` trên máy này đọc biến từ `.env` (không phải `.env.local`) — thêm biến mới cho Vercel thì set cả 2 nơi để test local được.
 - Deploy lại: `npx vercel deploy --prod`
 

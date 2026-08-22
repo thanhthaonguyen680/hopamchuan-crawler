@@ -7,7 +7,7 @@
 import { getPool } from "./db.js";
 import { searchSongs } from "./search.js";
 
-export { requireAuth, isAuthenticated } from "./auth.js";
+export { requireAuth, isAuthenticated, getSessionUserId } from "./auth.js";
 
 /**
  * HTTP Basic Auth check — only used by src/viewer.ts (local/LAN), and only
@@ -378,9 +378,10 @@ export function renderSignupPage(error?: string): string {
   );
 }
 
-export async function renderSongList(): Promise<string> {
+export async function renderSongList(userId: number): Promise<string> {
   const { rows } = await getPool().query<{ source_id: number; title: string; artist: string | null }>(
-    "SELECT source_id, title, artist FROM songs ORDER BY source_id DESC LIMIT 200",
+    "SELECT source_id, title, artist FROM songs WHERE user_id = $1 ORDER BY source_id DESC LIMIT 200",
+    [userId],
   );
 
   const items = rows
@@ -397,13 +398,13 @@ export async function renderSongList(): Promise<string> {
   );
 }
 
-export async function renderSearchResults(query: string): Promise<string> {
+export async function renderSearchResults(query: string, userId: number): Promise<string> {
   const results = await searchSongs(query);
 
   const ids = results.map((r) => r.id);
   const { rows: existing } = await getPool().query<{ source_id: number }>(
-    "SELECT source_id FROM songs WHERE source_id = ANY($1::int[])",
-    [ids],
+    "SELECT source_id FROM songs WHERE user_id = $1 AND source_id = ANY($2::int[])",
+    [userId, ids],
   );
   const inDb = new Set(existing.map((r) => r.source_id));
 
@@ -431,12 +432,12 @@ export async function renderSearchResults(query: string): Promise<string> {
   );
 }
 
-export async function renderSongDetail(sourceId: number): Promise<string | null> {
+export async function renderSongDetail(sourceId: number, userId: number): Promise<string | null> {
   const { rows } = await getPool().query(
     `SELECT source_id, source_url, title, artist, composer, "key", capo, tempo, genre,
             lyrics_with_chords, view_count, published_date, crawled_at
-     FROM songs WHERE source_id = $1`,
-    [sourceId],
+     FROM songs WHERE source_id = $1 AND user_id = $2`,
+    [sourceId, userId],
   );
   const song = rows[0];
   if (!song) return null;

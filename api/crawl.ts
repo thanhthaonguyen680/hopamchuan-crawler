@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, layout } from "../src/lib/render.js";
+import { requireAuth, getSessionUserId, layout } from "../src/lib/render.js";
 import { fetchSongsByIds } from "../src/lib/discover.js";
 import { parseSong } from "../src/lib/parser.js";
 import { upsertSong, insertCrawlLog, newRunId } from "../src/lib/db.js";
@@ -14,6 +14,7 @@ import { upsertSong, insertCrawlLog, newRunId } from "../src/lib/db.js";
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
+  const userId = getSessionUserId(req.headers.cookie)!;
 
   if (req.method !== "POST") {
     res.status(405).send(layout("Method not allowed", "<p>Chỉ chấp nhận POST.</p>"));
@@ -38,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { song: parsed, provider } = await parseSong(song.html, song.url);
-    await upsertSong(sourceId, parsed);
+    await upsertSong(userId, sourceId, parsed);
     await insertCrawlLog({
       runId,
       sourceId,

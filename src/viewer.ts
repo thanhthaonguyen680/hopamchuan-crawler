@@ -10,8 +10,23 @@
 import "dotenv/config";
 import { createServer } from "node:http";
 import { isAuthorized, layout, renderSongList, renderSearchResults, renderSongDetail } from "./lib/render.js";
+import { findUserByUsername } from "./lib/auth.js";
 
 const PORT = Number(process.env.VIEWER_PORT ?? 3000);
+
+// Songs are per-account now — the local viewer operates on one account's
+// data, picked via CRAWL_USERNAME (same account `npm run crawl` writes to).
+const viewerUsername = process.env.CRAWL_USERNAME;
+if (!viewerUsername) {
+  console.error("CRAWL_USERNAME not set in .env — sign up an account at /signup on the web app, then set CRAWL_USERNAME to that username.");
+  process.exit(1);
+}
+const viewerUser = await findUserByUsername(viewerUsername);
+if (!viewerUser) {
+  console.error(`No user named "${viewerUsername}" found — sign up at /signup first, then set CRAWL_USERNAME to match.`);
+  process.exit(1);
+}
+const userId = viewerUser.id;
 
 const server = createServer(async (req, res) => {
   try {
@@ -28,20 +43,20 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(await renderSongList());
+      res.end(await renderSongList(userId));
       return;
     }
 
     if (url.pathname === "/search") {
       const q = url.searchParams.get("q")?.trim();
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(q ? await renderSearchResults(q) : await renderSongList());
+      res.end(q ? await renderSearchResults(q, userId) : await renderSongList(userId));
       return;
     }
 
     const match = url.pathname.match(/^\/song\/(\d+)$/);
     if (match) {
-      const html = await renderSongDetail(Number(match[1]));
+      const html = await renderSongDetail(Number(match[1]), userId);
       if (!html) {
         res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
         res.end(layout("Not found", "<p>Không tìm thấy bài hát này.</p>"));

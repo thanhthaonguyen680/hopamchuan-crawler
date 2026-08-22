@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, layout, renderSongDetail } from "../../src/lib/render.js";
+import { requireAuth, getSessionUserId, layout, renderSongDetail } from "../../src/lib/render.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const html = await renderSongDetail(sourceId);
+  const html = await renderSongDetail(sourceId, getSessionUserId(req.headers.cookie)!);
   if (!html) {
     res.status(404).send(layout("Not found", "<p>Không tìm thấy bài hát này.</p>"));
     return;

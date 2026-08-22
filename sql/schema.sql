@@ -1,14 +1,28 @@
 -- HopAmChuan crawler schema
--- Two tables: `songs` (parsed data) and `crawl_log` (per-attempt crawl history/status/errors).
+-- Three tables: `users` (accounts), `songs` (parsed data, per-user), and
+-- `crawl_log` (per-attempt crawl history/status/errors).
+
+-- Self-serve accounts (anyone can /signup and share the link — no shared
+-- password). Each user has their own private song collection below.
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGSERIAL PRIMARY KEY,
+    username        TEXT NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS songs (
     id                  BIGSERIAL PRIMARY KEY,
 
+    -- Owner of this crawled copy. Data is per-user, not shared: two users
+    -- crawling the same hopamchuan.com song each get their own row.
+    user_id             BIGINT REFERENCES users(id) ON DELETE CASCADE,
+
     -- The numeric ID from hopamchuan.com/song/{source_id}/{slug}/ — this is
-    -- what the ID-range discovery script walks, and how we know the current
-    -- "high water mark" to resume from on the next crawl.
-    source_id           INTEGER NOT NULL UNIQUE,
-    source_url          TEXT NOT NULL UNIQUE,
+    -- what the ID-range discovery script walks. Unique per-user, not
+    -- globally (see idx_songs_user_source_id below).
+    source_id           INTEGER NOT NULL,
+    source_url          TEXT NOT NULL,
 
     title               TEXT NOT NULL,
     artist              TEXT,
@@ -93,12 +107,11 @@ CREATE INDEX IF NOT EXISTS idx_crawl_log_status ON crawl_log (status);
 CREATE INDEX IF NOT EXISTS idx_crawl_log_started_at ON crawl_log (started_at);
 
 
--- Self-serve accounts for the public viewer (anyone can /signup and share the
--- link — no shared password). All users see the same songs table; this only
--- gates who can log in.
-CREATE TABLE IF NOT EXISTS users (
-    id              BIGSERIAL PRIMARY KEY,
-    username        TEXT NOT NULL UNIQUE,
-    password_hash   TEXT NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- Migration for DBs created before `songs` was per-user: add the column and
+-- swap the old global-unique constraints for per-user ones. No-op on a
+-- fresh install (column/indexes already exist from the CREATE TABLE above).
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE songs DROP CONSTRAINT IF EXISTS songs_source_id_key;
+ALTER TABLE songs DROP CONSTRAINT IF EXISTS songs_source_url_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_user_source_id ON songs (user_id, source_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_user_source_url ON songs (user_id, source_url);

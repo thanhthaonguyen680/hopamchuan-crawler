@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, layout } from "../../../src/lib/render.js";
+import { requireAuth, getSessionUserId, layout } from "../../../src/lib/render.js";
 import { getPool } from "../../../src/lib/db.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -17,7 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  await getPool().query("DELETE FROM songs WHERE source_id = $1", [sourceId]);
+  await getPool().query("DELETE FROM songs WHERE source_id = $1 AND user_id = $2", [
+    sourceId,
+    getSessionUserId(req.headers.cookie),
+  ]);
 
   res.setHeader("Location", "/");
   res.status(303).end();

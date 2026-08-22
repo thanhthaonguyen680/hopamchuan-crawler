@@ -21,29 +21,30 @@ export function newRunId(): string {
   return randomUUID();
 }
 
-/** Highest known hopamchuan.com numeric song ID already stored in `songs`. */
-export async function getMaxKnownSourceId(): Promise<number> {
+/** Highest known hopamchuan.com numeric song ID already stored for this user. */
+export async function getMaxKnownSourceId(userId: number): Promise<number> {
   const { rows } = await getPool().query<{ max: number | null }>(
-    "SELECT MAX(source_id) AS max FROM songs",
+    "SELECT MAX(source_id) AS max FROM songs WHERE user_id = $1",
+    [userId],
   );
   return rows[0]?.max ?? 0;
 }
 
-export async function sourceIdExists(sourceId: number): Promise<boolean> {
+export async function sourceIdExists(userId: number, sourceId: number): Promise<boolean> {
   const { rows } = await getPool().query(
-    "SELECT 1 FROM songs WHERE source_id = $1 LIMIT 1",
-    [sourceId],
+    "SELECT 1 FROM songs WHERE user_id = $1 AND source_id = $2 LIMIT 1",
+    [userId, sourceId],
   );
   return rows.length > 0;
 }
 
-export async function upsertSong(sourceId: number, song: ParsedSong): Promise<void> {
+export async function upsertSong(userId: number, sourceId: number, song: ParsedSong): Promise<void> {
   await getPool().query(
     `INSERT INTO songs (
-       source_id, source_url, title, artist, composer, "key", capo, tempo,
+       user_id, source_id, source_url, title, artist, composer, "key", capo, tempo,
        genre, lyrics_with_chords, chords_used, view_count, published_date, crawled_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-     ON CONFLICT (source_id) DO UPDATE SET
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+     ON CONFLICT (user_id, source_id) DO UPDATE SET
        source_url = EXCLUDED.source_url,
        title = EXCLUDED.title,
        artist = EXCLUDED.artist,
@@ -58,6 +59,7 @@ export async function upsertSong(sourceId: number, song: ParsedSong): Promise<vo
        published_date = EXCLUDED.published_date,
        crawled_at = EXCLUDED.crawled_at`,
     [
+      userId,
       sourceId,
       song.source_url,
       song.title,
