@@ -1,6 +1,6 @@
 # HopAmChuan Crawler
 
-Crawl bài hát mới từ hopamchuan.com, parse HTML → JSON (lời + hợp âm) bằng Gemini, lưu Postgres. Có web viewer public (đổi tông, xem sơ đồ ngón bấm guitar). Xem `n8n/README.md` để chạy tự động qua cron.
+hopamchuan.com hay chèn quảng cáo video khi xem hợp âm, gây khó chịu. Tool này crawl **những bài mình chọn** (không crawl hàng loạt), parse ra lời + hợp âm sạch bằng Gemini, lưu Postgres, xem lại qua web viewer riêng — không quảng cáo, đổi tông được, tap hợp âm ra sơ đồ ngón bấm guitar. Xem `n8n/README.md` nếu muốn chạy tự động qua cron.
 
 **Production**: https://hopamchuan-crawler.vercel.app (cần đăng nhập — tài khoản đặt riêng qua `VIEWER_USERNAME`/`VIEWER_PASSWORD` trên Vercel, không lưu ở đây)
 
