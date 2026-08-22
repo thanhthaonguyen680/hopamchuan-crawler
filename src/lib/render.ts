@@ -7,9 +7,12 @@
 import { getPool } from "./db.js";
 import { searchSongs } from "./search.js";
 
+export { requireAuth, isAuthenticated } from "./auth.js";
+
 /**
  * HTTP Basic Auth check — only used by src/viewer.ts (local/LAN), and only
- * enforced when VIEWER_PASSWORD is set there.
+ * enforced when VIEWER_PASSWORD is set there. Unrelated to the multi-user
+ * accounts (auth.ts) used by the public Vercel deployment.
  */
 export function isAuthorized(authHeader: string | undefined): boolean {
   const password = process.env.VIEWER_PASSWORD;
@@ -23,62 +26,6 @@ export function isAuthorized(authHeader: string | undefined): boolean {
   if (separatorIndex === -1) return false;
 
   return decoded.slice(0, separatorIndex) === username && decoded.slice(separatorIndex + 1) === password;
-}
-
-/**
- * Cookie-based session auth for the public Vercel deployment (api/*.ts) — a
- * friendly login page instead of the browser's native Basic Auth popup.
- * SESSION_SECRET is a separate random value from VIEWER_PASSWORD, so the
- * password itself is never stored in the browser.
- */
-const SESSION_COOKIE = "hac_session";
-
-function parseCookies(header: string | undefined): Record<string, string> {
-  if (!header) return {};
-  const out: Record<string, string> = {};
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
-  }
-  return out;
-}
-
-export function isAuthenticated(cookieHeader: string | undefined): boolean {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) return true; // no secret configured — auth disabled
-  return parseCookies(cookieHeader)[SESSION_COOKIE] === secret;
-}
-
-export function checkCredentials(username: string, password: string): boolean {
-  const expectedUser = process.env.VIEWER_USERNAME || "";
-  const expectedPass = process.env.VIEWER_PASSWORD || "";
-  return Boolean(expectedUser && expectedPass) && username === expectedUser && password === expectedPass;
-}
-
-export function setSessionCookieHeader(): string {
-  const secret = process.env.SESSION_SECRET || "";
-  return `${SESSION_COOKIE}=${secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`;
-}
-
-export function clearSessionCookieHeader(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
-}
-
-/**
- * Auth gate for api/*.ts handlers. Returns true if the request may proceed;
- * otherwise it has already written a 303 redirect to /login and the caller
- * must `return` immediately. Uses only ServerResponse-level methods so it
- * works with both VercelResponse and a plain Node http.ServerResponse.
- */
-export function requireAuth(
-  req: { headers: { cookie?: string } },
-  res: { setHeader: (name: string, value: string) => void; writeHead: (code: number, headers?: Record<string, string>) => void; end: () => void },
-): boolean {
-  if (isAuthenticated(req.headers.cookie)) return true;
-  res.writeHead(303, { Location: "/login" });
-  res.end();
-  return false;
 }
 
 export function escapeHtml(s: string): string {
@@ -263,6 +210,7 @@ const STYLE = `
     padding: 13px; border-radius: 10px; font-size: 1rem; cursor: pointer; margin-top: 4px;
   }
   .login-error { background: var(--red-dim); color: var(--red); padding: 10px 14px; border-radius: 10px; font-size: 0.88rem; margin-bottom: 16px; }
+  .login-switch { margin-top: 18px; font-size: 0.88rem; color: var(--text-dim); }
 `;
 
 /** Delete button — a self-contained POST form with a JS confirm dialog. */
@@ -405,6 +353,26 @@ export function renderLoginPage(error?: string): string {
         <input type="password" name="password" placeholder="Mật khẩu" autocomplete="current-password" required>
         <button type="submit">Đăng nhập</button>
       </form>
+      <p class="login-switch">Chưa có tài khoản? <a href="/signup">Đăng ký</a></p>
+    </div></div>`,
+    { hideHeader: true },
+  );
+}
+
+export function renderSignupPage(error?: string): string {
+  return layout(
+    "Đăng ký — Hợp Âm Chuẩn",
+    `<div class="login-page"><div class="login-box">
+      <div class="logo">🎸</div>
+      <h1>Hợp Âm Chuẩn</h1>
+      <p class="subtitle">Tạo tài khoản để dùng chung</p>
+      ${error ? `<div class="login-error">${escapeHtml(error)}</div>` : ""}
+      <form class="login-form" method="POST" action="/api/signup">
+        <input type="text" name="username" placeholder="Tên đăng nhập (tối thiểu 3 ký tự)" autocomplete="username" required autofocus minlength="3">
+        <input type="password" name="password" placeholder="Mật khẩu (tối thiểu 6 ký tự)" autocomplete="new-password" required minlength="6">
+        <button type="submit">Đăng ký</button>
+      </form>
+      <p class="login-switch">Đã có tài khoản? <a href="/login">Đăng nhập</a></p>
     </div></div>`,
     { hideHeader: true },
   );

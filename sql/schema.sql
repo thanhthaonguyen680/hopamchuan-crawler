@@ -91,3 +91,14 @@ CREATE INDEX IF NOT EXISTS idx_crawl_log_run_id ON crawl_log (run_id);
 CREATE INDEX IF NOT EXISTS idx_crawl_log_source_id ON crawl_log (source_id);
 CREATE INDEX IF NOT EXISTS idx_crawl_log_status ON crawl_log (status);
 CREATE INDEX IF NOT EXISTS idx_crawl_log_started_at ON crawl_log (started_at);
+
+
+-- Self-serve accounts for the public viewer (anyone can /signup and share the
+-- link — no shared password). All users see the same songs table; this only
+-- gates who can log in.
+CREATE TABLE IF NOT EXISTS users (
+    id              BIGSERIAL PRIMARY KEY,
+    username        TEXT NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -2,7 +2,7 @@
 
 hopamchuan.com hay chèn quảng cáo video khi xem hợp âm, gây khó chịu. Tool này crawl **những bài mình chọn** (không crawl hàng loạt), parse ra lời + hợp âm sạch bằng Gemini, lưu Postgres, xem lại qua web viewer riêng — không quảng cáo, đổi tông được, tap hợp âm ra sơ đồ ngón bấm guitar. Xem `n8n/README.md` nếu muốn chạy tự động qua cron.
 
-**Production**: https://hopamchuan-crawler.vercel.app (cần đăng nhập — tài khoản đặt riêng qua `VIEWER_USERNAME`/`VIEWER_PASSWORD` trên Vercel, không lưu ở đây)
+**Production**: https://hopamchuan-crawler.vercel.app — ai có link cũng vào được, tự `/signup` tạo tài khoản riêng (không dùng chung 1 mật khẩu).
 
 ## Ghi chú quan trọng về hopamchuan.com
 
@@ -44,18 +44,19 @@ src/lib/
   parser.ts      parseSong() — dispatcher theo LLM_PROVIDER (claude/gemini)
   chords.ts      transposeChord(), getChordShape() — nhạc lý + sơ đồ ngón bấm
   render.ts      HTML render dùng chung cho viewer.ts (local) và api/*.ts (Vercel)
+  auth.ts        Tài khoản đa người dùng: hash mật khẩu (scrypt), sign session cookie
   db.ts          pg Pool, upsertSong(), insertCrawlLog()
 src/crawl.ts     script tổng — production entrypoint
 src/viewer.ts    web server local (npm run viewer)
 api/*.ts         Vercel serverless functions (bản public, cùng logic render.ts)
-sql/schema.sql   DDL bảng songs + crawl_log
+sql/schema.sql   DDL bảng songs, crawl_log, users
 ```
 
 ## Deploy (Vercel)
 
 - `api/*.ts` dùng chung `src/lib/render.ts` với `src/viewer.ts` — chỉ khác lớp server (Vercel function vs Node http server liên tục). Script crawl/parse **không** chạy trên Vercel, chỉ chạy local; Vercel chỉ đọc/ghi DB qua web UI (crawl button, xoá bài).
 - `DATABASE_URL` trỏ thẳng Neon — cùng 1 DB cho local và Vercel, crawl xong thấy ngay trên web.
-- Login: cookie session (`hac_session` = `SESSION_SECRET`, không phải mật khẩu) qua `POST /api/login`, `requireAuth()` gate mọi route khác. `noindex` để Google không index.
+- Login: đa người dùng, tự `/signup` tạo tài khoản (username + mật khẩu hash bằng scrypt, lưu bảng `users`). Session là cookie `hac_session` ký bằng `SESSION_SECRET` (HMAC, chứa user id + chữ ký — không phải mật khẩu). Mọi người dùng chung 1 danh sách bài hát, tài khoản chỉ để đăng nhập, không tách dữ liệu riêng. `requireAuth()` gate mọi route, `noindex` để Google không index.
 - ⚠️ `vercel dev` trên máy này đọc biến từ `.env` (không phải `.env.local`) — thêm biến mới cho Vercel thì set cả 2 nơi để test local được.
 - Deploy lại: `npx vercel deploy --prod`
 
